@@ -134,7 +134,7 @@ void  reverse_string(char *str){
 void  word_print(char *str){
     //suggested local variables
     int len = strlen(str);            //length of string - aka strlen(str);
-   // int last_char_idx;  //index of last char - strlen(str)-1;
+    int last_char_idx = len -1;  //index of last char - strlen(str)-1;
     int wc = 0;         //counts words
     int wlen = 0;       //length of current word
     bool word_start = false;    //am I at the start of a new word
