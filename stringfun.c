@@ -43,19 +43,23 @@ void usage(char *exename){
 int count_words(char *str){
     // Suggested local variables
     int len = strlen(str);
-    int wcn = 0;
+    int wc = 0;
     bool word_start = false;
 
     // Please implement
-    for (int i = 0; i<len; i++) {
-	    if(word_start && str[i] != SPACE_CHAR) {
-		    wc++;
-		    word_star = true;
-		}
-	    else if (word_start && str[i] == SPACE_CHAR) {
-		    word_start = false;
-		}
-	 }
+    for (int i = 0; i < len; i++) {
+        char ch = str[i];
+        if (!word_start) {
+            if (ch != SPACE_CHAR) {
+                wc++;
+                word_start = true;
+            }
+        } else {
+            if (ch == SPACE_CHAR) {
+                word_start = false;
+            }
+        }
+    }
     return wc;
 }
 
@@ -136,20 +140,30 @@ void  word_print(char *str){
     bool word_start = false;    //am I at the start of a new word
 
     // Please implement
-    for (int i = 0; i< len; i++) {
-	    if (!word_start && str[i] != SPACE_CHAR && str[i] != '\0') {
-		    wc++;
-		    word_start = true;
-		    wlen = 0;
-		    printf("%d. ", wc);
-		}
-	    if (word_start && (str[i] == SPACE_CHAR || str[i] == '\0')) {
-		    printf(" (%d)\n", wlen);
-		    word_start = false;
-		} else if (word_start) {
-			printf("%c", str[i]);
-			wlen++;
-		}
+    ffor (int i = 0; i < len; i++) {
+        char ch = str[i];
+
+        if (!word_start) {
+            if (ch != SPACE_CHAR) {
+                wc++;
+                wlen = 0;
+                printf("%d. ", wc);
+                word_start = true;
+            }
+        }
+
+        if (word_start) {
+            if (ch != SPACE_CHAR) {
+                printf("%c", ch);
+                wlen++;
+            }
+
+            if (ch == SPACE_CHAR || i == last_char_idx) {
+                printf(" (%d)\n", wlen);
+                word_start = false;
+                wlen = 0;
+            }
+        }
     }
 
 }
@@ -235,4 +249,3 @@ int main(int argc, char *argv[]){
     //          would happen if we forgot the break statement?
     //ANS: To stop the fall-through behaviour of the switch-case operation. Without it subsequent operations will also execute causings errors.
 }
-  
