@@ -47,84 +47,78 @@ int open_db(char *dbFile, bool should_truncate)
     return fd;
 }
 
-/*
- *  get_student
- *      fd:  linux file descriptor
- *      id:  the student id we are looking forname of the
- *      *s:  a pointer where the located (if found) student data will be
- *           copied
- *
- *  returns:  NO_ERROR       student located and copied into *s
- *            ERR_DB_FILE    database file I/O issue
- *            SRCH_NOT_FOUND student was not located in the database
- *
- *  console:  Does not produce any console I/O used by other functions
- */
-int get_student(int fd, int id, student_t *s)
-{
-    // TODO
-    return NOT_IMPLEMENTED_YET;
+int get_student(int fd, int id, student_t *s) {
+    int offset = id * STUDENT_RECORD_SIZE;
+    if (lseek(fd, offset, SEEK_SET) == -1) {
+        printf(M_ERR_DB_READ);
+        return ERR_DB_FILE;
+    }
+    if (read(fd, s, STUDENT_RECORD_SIZE) != STUDENT_RECORD_SIZE) {
+        printf(M_ERR_DB_READ);
+        return ERR_DB_FILE;
+    }
+    if (s->id == 0) {
+        return SRCH_NOT_FOUND;
+    }
+    return NO_ERROR;
 }
 
-/*
- *  add_student
- *      fd:     linux file descriptor
- *      id:     student id (range is defined in db.h )
- *      fname:  student first name
- *      lname:  student last name
- *      gpa:    GPA as an integer (range defined in db.h)
- *
- *  Adds a new student to the database.  After calculating the index for the
- *  student, check if there is another student already at that location.  A good
- *  way is to use something like memcmp() to ensure that the location for this
- *  student contains all zero byes indicating the space is empty.
- *
- *  returns:  NO_ERROR       student added to database
- *            ERR_DB_FILE    database file I/O issue
- *            ERR_DB_OP      database operation logically failed (aka student
- *                           already exists)
- *
- *
- *  console:  M_STD_ADDED       on success
- *            M_ERR_DB_ADD_DUP  student already exists
- *            M_ERR_DB_READ     error reading or seeking the database file
- *            M_ERR_DB_WRITE    error writing to db file (adding student)
- *
- */
-int add_student(int fd, int id, char *fname, char *lname, int gpa)
-{
-    // TODO
-    printf(M_NOT_IMPL);
-    return NOT_IMPLEMENTED_YET;
+
+int add_student(int fd, int id, char *fname, char *lname, int gpa) {
+    student_t student = {id, "", "", gpa};
+    strncpy(student.fname, fname, sizeof(student.fname) - 1);
+    strncpy(student.lname, lname, sizeof(student.lname) - 1);
+
+    int offset = id * STUDENT_RECORD_SIZE;
+    if (lseek(fd, offset, SEEK_SET) == -1) {
+        printf(M_ERR_DB_WRITE);
+        return ERR_DB_FILE;
+    }
+
+    student_t existing;
+    if (read(fd, &existing, STUDENT_RECORD_SIZE) == STUDENT_RECORD_SIZE && existing.id != 0) {
+        printf(M_ERR_DB_ADD_DUP, id);
+        return ERR_DB_OP;
+    }
+
+    if (lseek(fd, offset, SEEK_SET) == -1) {
+        printf(M_ERR_DB_WRITE);
+        return ERR_DB_FILE;
+    }
+
+    if (write(fd, &student, STUDENT_RECORD_SIZE) != STUDENT_RECORD_SIZE) {
+        printf(M_ERR_DB_WRITE);
+        return ERR_DB_FILE;
+    }
+
+    printf(M_STD_ADDED, id);
+    return NO_ERROR;
 }
 
-/*
- *  del_student
- *      fd:     linux file descriptor
- *      id:     student id to be deleted
- *
- *  Removes a student to the database.  Use the get_student() function to
- *  locate the student to be deleted. If there is a student at that location
- *  write an empty student record - see EMPTY_STUDENT_RECORD from db.h at
- *  that location.
- *
- *  returns:  NO_ERROR       student deleted from database
- *            ERR_DB_FILE    database file I/O issue
- *            ERR_DB_OP      database operation logically failed (aka student
- *                           not in database)
- *
- *
- *  console:  M_STD_DEL_MSG      on success
- *            M_STD_NOT_FND_MSG  student not in database, cant be deleted
- *            M_ERR_DB_READ      error reading or seeking the database file
- *            M_ERR_DB_WRITE     error writing to db file (adding student)
- *
- */
-int del_student(int fd, int id)
-{
-    // TODO
-    printf(M_NOT_IMPL);
-    return NOT_IMPLEMENTED_YET;
+
+int del_student(int fd, int id) {
+    student_t student;
+    int rc = get_student(fd, id, &student);
+    if (rc == SRCH_NOT_FOUND) {
+        printf(M_STD_NOT_FND_MSG, id);
+        return ERR_DB_OP;
+    } else if (rc != NO_ERROR) {
+        return rc;
+    }
+
+    int offset = id * STUDENT_RECORD_SIZE;
+    if (lseek(fd, offset, SEEK_SET) == -1) {
+        printf(M_ERR_DB_WRITE);
+        return ERR_DB_FILE;
+    }
+
+    if (write(fd, &EMPTY_STUDENT_RECORD, STUDENT_RECORD_SIZE) != STUDENT_RECORD_SIZE) {
+        printf(M_ERR_DB_WRITE);
+        return ERR_DB_FILE;
+    }
+
+    printf(M_STD_DEL_MSG, id);
+    return NO_ERROR;
 }
 
 /*
@@ -198,110 +192,61 @@ int print_db(int fd)
     return NOT_IMPLEMENTED_YET;
 }
 
-/*
- *  print_student
- *      *s:   a pointer to a student_t structure that should
- *            contain a valid student to be printed
- *
- *  Start by ensuring that provided student pointer is valid.  To do this
- *  make sure it is not NULL and that s->id is not zero.  After ensuring
- *  that the student is valid, print it the exact way that is described
- *  in the print_db() function by first printing the header then the
- *  student data:
- *
- *     printf(STUDENT_PRINT_HDR_STRING, "ID",
- *                  "FIRST NAME", "LAST_NAME", "GPA");
- *
- *     printf(STUDENT_PRINT_FMT_STRING, s->id, s->fname,
- *                    student.lname, calculated_gpa_from_s);
- *
- *  Dont forget that  the GPA in the student structure is an int, to convert
- *  it into a real gpa divide by 100.0 and store in a float variable.
- *
- *  returns:  nothing, this is a void function
- *
- *
- *  console:  <see above>      on success, print table or database empty
- *            M_ERR_STD_PRINT  if the function argument s is NULL or if
- *                             s->id is zero
- *
- */
-void print_student(student_t *s)
-{
-    // TODO
-    printf(M_NOT_IMPL);
+
+void print_student(student_t *s) {
+    if (s == NULL || s->id == 0) {
+        printf(M_ERR_STD_PRINT);
+        return;
+    }
+    printf(STUDENT_PRINT_HDR_STRING, "ID", "FIRST NAME", "LAST NAME", "GPA");
+    float gpa = s->gpa / 100.0;
+    printf(STUDENT_PRINT_FMT_STRING, s->id, s->fname, s->lname, gpa);
 }
 
-/*
- *  NOTE IMPLEMENTING THIS FUNCTION IS EXTRA CREDIT
- *
- *  compress_db
- *      fd:     linux file descriptor
- *
- *  This assignment takes advantage of the way Linux handles sparse files
- *  on disk. Thus if there is a large hole between student records, Linux
- *  will not use any physical storage.  However, when a database record is
- *  deleted storage is used to write a blank - see EMPTY_STUDENT_RECORD from
- *  db.h - record.
- *
- *  Since Linux provides no way to delete data in the middle of a file, and
- *  deleted records take up physical storage, this function will compress the
- *  database by rewriting a new database file that only includes valid student
- *  records. There are a number of ways to do this, but since this is extra credit
- *  you need to figure this out on your own.
- *
- *  At a high level create a temporary database file then copy all valid students from
- *  the active database (passed in via fd) to the temporary file. When this is done
- *  rename the temporary database file to the name of the real database file. See
- *  the constants in db.h for required file names:
- *
- *         #define DB_FILE     "student.db"        //name of database file
- *         #define TMP_DB_FILE ".tmp_student.db"   //for extra credit
- *
- *  Note that you are passed in the fd of the database file to be compressed,
- *  it is very likely you will need to close it to overwrite it with the
- *  compressed version of the file.  To ensure the caller can work with the
- *  compressed file after you create it, it is a good design to return the fd
- *  of the new compressed file from this function
- *
- *  returns:  <number>       returns the fd of the compressed database file
- *            ERR_DB_FILE    database file I/O issue
- *
- *
- *  console:  M_DB_COMPRESSED_OK  on success, the db was successfully compressed.
- *            M_ERR_DB_OPEN    error when opening/creating temporary database file.
- *                             this error should also be returned after you
- *                             compressed the database file and if you are unable
- *                             to open it to pass the fd back to the caller
- *            M_ERR_DB_CREATE  error creating the db file. For instance the
- *                             inability to copy the temporary file back as
- *                             the primary database file.
- *            M_ERR_DB_READ    error reading or seeking the the db or tempdb file
- *            M_ERR_DB_WRITE   error writing to db or tempdb file (adding student)
- *
- */
-int compress_db(int fd)
-{
-    // TODO
-    printf(M_NOT_IMPL);
+
+int compress_db(int fd) {
+    close(fd);
+    int temp_fd = open(TMP_DB_FILE, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    if (temp_fd == -1) {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    fd = open(DB_FILE, O_RDONLY);
+    if (fd == -1) {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    student_t student;
+    while (read(fd, &student, STUDENT_RECORD_SIZE) == STUDENT_RECORD_SIZE) {
+        if (student.id != 0) {
+            if (write(temp_fd, &student, STUDENT_RECORD_SIZE) != STUDENT_RECORD_SIZE) {
+                printf(M_ERR_DB_WRITE);
+                return ERR_DB_FILE;
+            }
+        }
+    }
+
+    close(fd);
+    close(temp_fd);
+
+    if (rename(TMP_DB_FILE, DB_FILE) == -1) {
+        printf(M_ERR_DB_CREATE);
+        return ERR_DB_FILE;
+    }
+
+    fd = open_db(DB_FILE, false);
+    if (fd == -1) {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    printf(M_DB_COMPRESSED_OK);
     return fd;
 }
 
-/*
- *  validate_range
- *      id:  proposed student id
- *      gpa: proposed gpa
- *
- *  This function validates that the id and gpa are in the allowable ranges
- *  as per the specifications.  It checks if the values are within the
- *  inclusive range using constents in db.h
- *
- *  returns:    NO_ERROR       on success, both ID and GPA are in range
- *              EXIT_FAIL_ARGS if either ID or GPA is out of range
- *
- *  console:  This function does not produce any output
- *
- */
+
 int validate_range(int id, int gpa)
 {
 
@@ -314,17 +259,7 @@ int validate_range(int id, int gpa)
     return NO_ERROR;
 }
 
-/*
- *  usage
- *      exename:  the name of the executable from argv[0]
- *
- *  Prints this programs expected usage
- *
- *  returns:    nothing, this is a void function
- *
- *  console:  This function prints the usage information
- *
- */
+
 void usage(char *exename)
 {
     printf("usage: %s -[h|a|c|d|f|p|z] options.  Where:\n", exename);
