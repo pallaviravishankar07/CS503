@@ -39,7 +39,7 @@ Please answer the following questions and submit in your repo for the second ass
     ```
     Can you think of any reason why the above implementation would be a **very bad idea** using the C programming language?  Specifically, address why the above code introduces a subtle bug that could be hard to identify at runtime? 
 
-    > **ANSWER:** The pass-by-reference approach (using a pointer) is better because it allows the function to directly modify the data passed to it. If you return a pointer to a local variable, it would cause issues since the memory gets cleared when the function ends.
+    > **ANSWER:** The pass-by-reference approach is better because it allows the function to directly modify the data passed to it. If you return a pointer to a local variable, it would cause issues since the memory gets cleared when the function ends.
 
 3. Another way the `get_student(...)` function could be implemented is as follows:
 
