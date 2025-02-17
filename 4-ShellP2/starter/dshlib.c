@@ -6,10 +6,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <errno.h>
 #include "dshlib.h"
 
 extern void print_dragon();  // Declaration of the dragon function
 
+int last_return_code = 0;  // Global variable to store the last return code
 
 // Allocate memory for cmd_buff
 int alloc_cmd_buff(cmd_buff_t *cmd_buff) {
@@ -89,18 +91,29 @@ int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
 // Execute built-in commands
 Built_In_Cmds exec_built_in_cmd(cmd_buff_t *cmd) {
     if (strcmp(cmd->argv[0], EXIT_CMD) == 0) {
-        exit(OK_EXIT);
+        exit(0);
     }
     if (strcmp(cmd->argv[0], "cd") == 0) {
         if (cmd->argc > 1) {
             if (chdir(cmd->argv[1]) != 0) {
                 perror("cd");
+                last_return_code = 1;
+            } else {
+                last_return_code = 0;
             }
+        } else {
+            last_return_code = 0;  // No argument, do nothing
         }
         return BI_EXECUTED;
     }
     if (strcmp(cmd->argv[0], "dragon") == 0) {
         print_dragon();
+        last_return_code = 0;
+        return BI_EXECUTED;
+    }
+    if (strcmp(cmd->argv[0], "rc") == 0) {
+        printf("%d\n", last_return_code);
+        last_return_code = 0;
         return BI_EXECUTED;
     }
     return BI_NOT_BI;
@@ -142,18 +155,34 @@ int exec_local_cmd_loop() {
         pid_t pid = fork();
         if (pid < 0) {
             perror("fork");
+            last_return_code = 1;
             continue;
         }
         
         if (pid == 0) {
             // Child process
             execvp(cmd.argv[0], cmd.argv);
-            perror("execvp");
-            exit(1);
+            if (errno == ENOENT) {
+                fprintf(stderr, "Command not found in PATH\n");
+                exit(127);
+            } else if (errno == EACCES) {
+                fprintf(stderr, "Permission denied\n");
+                exit(126);
+            } else {
+                perror("execvp");
+                exit(1);
+            }
         } else {
             // Parent process
             int status;
             waitpid(pid, &status, 0);
+            if (WIFEXITED(status)) {
+                last_return_code = WEXITSTATUS(status);
+            } else if (WIFSIGNALED(status)) {
+                last_return_code = 128 + WTERMSIG(status);
+            } else {
+                last_return_code = 1;
+            }
         }
     }
 

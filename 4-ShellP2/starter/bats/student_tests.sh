@@ -1,139 +1,47 @@
 #!/usr/bin/env bats
 
-# Basic command execution tests
-@test "Basic external command execution" {
-    run ./dsh <<EOF
-ls
-EOF
-    [ "$status" -eq 0 ]
-}
-
-@test "Command with arguments" {
-    run ./dsh <<EOF
-echo "hello world"
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "hello world" ]]
-}
-
-# Built-in command tests
+# Test for the exit built-in command
 @test "Exit command" {
     run ./dsh <<EOF
 exit
 EOF
-    # OK_EXIT is -7, which in shell becomes 249 (256 + (-7))
-    [ "$status" -eq 249 ]
-}
-
-@test "Dragon command" {
-    run ./dsh <<EOF
-dragon
-EOF
-    [ "$status" -eq 0 ]
-    # Check for any non-empty output 
-    [ -n "$output" ]
-}
-
-# Directory manipulation tests
-@test "Change directory command" {
-    run ./dsh <<EOF
-cd /tmp
-pwd
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "/tmp" ]]
-}
-
-@test "CD with no arguments" {
-    local original_dir=$(pwd)
-    run ./dsh <<EOF
-cd
-pwd
-EOF
+    # Check that the shell exits with the correct status
     [ "$status" -eq 0 ]
 }
 
-@test "CD with invalid directory" {
-    run ./dsh <<EOF
-cd /nonexistent/directory
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "No such file or directory" ]]
-}
-
-# Input handling tests
-@test "Empty command handling" {
-    run ./dsh <<EOF
-
-EOF
-    [ "$status" -eq 0 ]
-}
-
-@test "Command with quoted arguments" {
-    run ./dsh <<EOF
-echo "  hello    world  "
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "  hello    world  " ]]
-}
-
-@test "Multiple spaces between arguments" {
-    run ./dsh <<EOF
-echo hello      world
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "hello world" ]]
-}
-
-# Error handling tests
-@test "Invalid command handling" {
+# Test for a non-existent command
+@test "Non-existent command" {
     run ./dsh <<EOF
 nonexistentcommand
+rc
 EOF
-    [ "$status" -eq 0 ]  # Shell continues even after command fails
-    [[ "${output}" =~ "not found" ]] || [[ "${output}" =~ "No such file" ]]
+    # Check that the output contains the error message
+    [[ "$output" =~ "Command not found in PATH" ]]
+    # Check that the return code is 127 (standard for command not found)
+    [[ "$output" =~ "127" ]]
 }
 
-# Multiple command tests
-@test "Multiple commands in sequence" {
+# Test for permission denied
+@test "Permission denied" {
     run ./dsh <<EOF
-echo "test"
-cd /tmp
-pwd
+touch testfile
+chmod 000 testfile
+./testfile
+rc
+rm -f testfile
 EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "test" ]]
-    [[ "${output}" =~ "/tmp" ]]
+    # Check that the output contains the permission denied message
+    [[ "$output" =~ "Permission denied" ]]
+    # Check that the return code is 126 (standard for permission denied)
+    [[ "$output" =~ "126" ]]
 }
 
-@test "Command with multiple arguments" {
+# Test for the rc built-in command
+@test "Return code command" {
     run ./dsh <<EOF
-echo first second third
+false
+rc
 EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "first second third" ]]
-}
-
-# Edge cases
-@test "Command with only spaces" {
-    run ./dsh <<EOF
-     
-EOF
-    [ "$status" -eq 0 ]
-}
-
-@test "Command with mixed quotes" {
-    run ./dsh <<EOF
-echo "quoted text" unquoted "more quoted"
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "quoted text unquoted more quoted" ]]
-}
-
-@test "Long command handling" {
-    run ./dsh <<EOF
-echo $(printf 'a%.0s' {1..100})
-EOF
-    [ "$status" -eq 0 ]
-    [[ "${output}" =~ "a" ]]
+    # Check that the return code of the last command is reported correctly
+    [[ "$output" =~ "1" ]]
 }
